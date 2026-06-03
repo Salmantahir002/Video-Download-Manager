@@ -1,4 +1,4 @@
-# Video Video Manager (v3.0)
+# Video Download Manager (v3.0)
 
 A beautiful, self-hosted web interface wrapper designed to make downloading high-quality videos and audio streams from YouTube and other sites incredibly easy.
 
