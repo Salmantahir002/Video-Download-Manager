@@ -1,0 +1,279 @@
+// DOM Elements
+const urlInput = document.getElementById('urlInput');
+const pasteBtn = document.getElementById('pasteBtn');
+const videoModeBtn = document.getElementById('videoModeBtn');
+const audioModeBtn = document.getElementById('audioModeBtn');
+const videoOptions = document.getElementById('videoOptions');
+const audioOptions = document.getElementById('audioOptions');
+const qualitySelect = document.getElementById('qualitySelect');
+const audioFormatSelect = document.getElementById('audioFormatSelect');
+const downloadBtn = document.getElementById('downloadBtn');
+const progressSection = document.getElementById('progressSection');
+const progressFill = document.getElementById('progressFill');
+const progressText = document.getElementById('progressText');
+const statusMessage = document.getElementById('statusMessage');
+const videoPreview = document.getElementById('videoPreview');
+const previewContent = document.getElementById('previewContent');
+const thumbnail = document.getElementById('thumbnail');
+const videoTitle = document.getElementById('videoTitle');
+const videoUploader = document.getElementById('videoUploader');
+const stopBtn = document.getElementById('stopBtn');
+
+// State
+let currentMode = 'video';
+let isDownloading = false;
+let debounceTimer = null;
+let currentDownloadId = null;
+let abortController = null;
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    // Paste button
+    pasteBtn.addEventListener('click', async () => {
+        try {
+            const text = await navigator.clipboard.readText();
+            urlInput.value = text;
+            urlInput.dispatchEvent(new Event('input'));
+        } catch (err) {
+            showStatus('error', 'Unable to access clipboard');
+        }
+    });
+
+    // URL input - fetch preview on change
+    urlInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            if (isValidUrl(urlInput.value)) {
+                fetchVideoInfo(urlInput.value);
+            } else {
+                hidePreview();
+            }
+        }, 500);
+    });
+
+    // Mode toggle
+    videoModeBtn.addEventListener('click', () => setMode('video'));
+    audioModeBtn.addEventListener('click', () => setMode('audio'));
+
+    // Download button
+    downloadBtn.addEventListener('click', startDownload);
+
+    // Stop button
+    stopBtn.addEventListener('click', stopDownload);
+
+    // Enter key to download
+    urlInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            startDownload();
+        }
+    });
+}
+
+function setMode(mode) {
+    currentMode = mode;
+
+    if (mode === 'video') {
+        videoModeBtn.classList.add('active');
+        audioModeBtn.classList.remove('active');
+        videoOptions.classList.remove('hidden');
+        audioOptions.classList.add('hidden');
+    } else {
+        audioModeBtn.classList.add('active');
+        videoModeBtn.classList.remove('active');
+        audioOptions.classList.remove('hidden');
+        videoOptions.classList.add('hidden');
+    }
+}
+
+function isValidUrl(string) {
+    try {
+        const url = new URL(string);
+        return url.hostname.includes('youtube.com') ||
+            url.hostname.includes('youtu.be') ||
+            url.hostname.includes('youtube');
+    } catch (_) {
+        return false;
+    }
+}
+
+async function fetchVideoInfo(url) {
+    try {
+        const response = await fetch(`/api/info?url=${encodeURIComponent(url)}`);
+
+        if (!response.ok) throw new Error('Failed to fetch video info');
+
+        const info = await response.json();
+        showPreview(info);
+    } catch (err) {
+        hidePreview();
+    }
+}
+
+function showPreview(info) {
+    thumbnail.src = info.thumbnail;
+    videoTitle.textContent = info.title;
+    videoUploader.textContent = info.uploader;
+
+    document.querySelector('.preview-placeholder').style.display = 'none';
+    previewContent.classList.add('active');
+}
+
+function hidePreview() {
+    document.querySelector('.preview-placeholder').style.display = 'flex';
+    previewContent.classList.remove('active');
+}
+
+async function startDownload() {
+    const url = urlInput.value.trim();
+
+    if (!url) {
+        showStatus('error', 'Please enter a video URL');
+        return;
+    }
+
+    if (!isValidUrl(url)) {
+        showStatus('error', 'Please enter a valid YouTube URL');
+        return;
+    }
+
+    if (isDownloading) return;
+
+    isDownloading = true;
+    currentDownloadId = null;
+    abortController = new AbortController();
+    downloadBtn.classList.add('loading');
+    downloadBtn.disabled = true;
+    hideStatus();
+    showProgress();
+
+    try {
+        const body = {
+            url,
+            mode: currentMode,
+            quality: currentMode === 'video' ? qualitySelect.value : null,
+            audioFormat: currentMode === 'audio' ? audioFormatSelect.value : null
+        };
+
+        const response = await fetch('/api/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: abortController.signal
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const text = decoder.decode(value);
+            const lines = text.split('\n');
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        handleProgressUpdate(data);
+                    } catch (e) {
+                        // Ignore parse errors
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        if (err.name === 'AbortError') {
+            // User cancelled - don't show error
+            console.log('Download was cancelled by user');
+        } else {
+            showStatus('error', 'Download failed. Please try again.');
+        }
+        hideProgress();
+    } finally {
+        isDownloading = false;
+        currentDownloadId = null;
+        abortController = null;
+        downloadBtn.classList.remove('loading');
+        downloadBtn.disabled = false;
+    }
+}
+
+async function stopDownload() {
+    if (!isDownloading) return;
+
+    // Abort the fetch request
+    if (abortController) {
+        abortController.abort();
+    }
+
+    // If we have a download ID, tell the server to kill the process
+    if (currentDownloadId) {
+        try {
+            await fetch(`/api/abort/${currentDownloadId}`, {
+                method: 'POST'
+            });
+        } catch (err) {
+            console.error('Error aborting download:', err);
+        }
+    }
+
+    hideProgress();
+    showStatus('error', 'Download was stopped.');
+
+    isDownloading = false;
+    currentDownloadId = null;
+    abortController = null;
+    downloadBtn.classList.remove('loading');
+    downloadBtn.disabled = false;
+}
+
+function handleProgressUpdate(data) {
+    if (data.type === 'started') {
+        currentDownloadId = data.downloadId;
+    } else if (data.type === 'progress') {
+        progressText.textContent = data.message;
+
+        // Parse percentage from message if available
+        const percentMatch = data.message.match(/(\d+\.?\d*)%/);
+        if (percentMatch) {
+            const percent = parseFloat(percentMatch[1]);
+            progressFill.style.width = `${percent}%`;
+        }
+    } else if (data.type === 'complete') {
+        progressFill.style.width = '100%';
+        setTimeout(() => {
+            hideProgress();
+            showStatus('success', 'Download complete! Check your downloads folder.');
+        }, 500);
+    } else if (data.type === 'aborted') {
+        hideProgress();
+        showStatus('error', 'Download was stopped.');
+    } else if (data.type === 'error') {
+        hideProgress();
+        showStatus('error', data.message || 'Download failed');
+    }
+}
+
+function showProgress() {
+    progressSection.classList.remove('hidden');
+    progressFill.style.width = '0%';
+    progressText.textContent = 'Starting download...';
+}
+
+function hideProgress() {
+    progressSection.classList.add('hidden');
+}
+
+function showStatus(type, message) {
+    statusMessage.className = `status-message ${type}`;
+    statusMessage.querySelector('.status-text').textContent = message;
+}
+
+function hideStatus() {
+    statusMessage.className = 'status-message hidden';
+}

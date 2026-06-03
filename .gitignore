@@ -1,0 +1,25 @@
+# Node.js dependencies
+node_modules/
+app/node_modules/
+
+# Downloads
+downloads/
+app/downloads/
+
+# Large precompiled binaries and tools
+ffmpeg-8.0.1-full_build/
+yt-dlp.exe
+Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe.db
+
+# Build outputs
+dist/
+build/
+app/bin/
+
+# OS/IDE files
+.vscode/
+.idea/
+*.lnk
+Thumbs.db
+Desktop.ini
+.DS_Store
