@@ -25,7 +25,7 @@ A beautiful, self-hosted web interface wrapper for [yt-dlp](https://github.com/y
 ```text
 Video-Download-Manager/
 ├── app/
-│   ├── bin/                # Contains local binaries (ignored by git, must be placed here)
+│   ├── bin/
 │   │   ├── ffmpeg.exe
 │   │   ├── folder_picker.cs
 │   │   ├── folder_picker.exe
@@ -41,17 +41,6 @@ Video-Download-Manager/
 ```
 
 ---
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-To run this application locally in development mode, you need:
-1. **Node.js** (v18 or higher recommended)
-2. **Binaries:** Download the following three executables and place them inside the `app/bin/` folder of your cloned repository:
-   * **`yt-dlp.exe`** (Download the Windows executable from the [yt-dlp GitHub Releases](https://github.com/yt-dlp/yt-dlp/releases/latest))
-   * **`ffmpeg.exe`** (Download from [gyan.dev Builds](https://www.gyan.dev/ffmpeg/builds/) - get the essentials zip and extract `ffmpeg.exe` from its `bin` folder)
-   * **`aria2c.exe`** (Download the Windows 64-bit zip from the [aria2 GitHub Releases](https://github.com/aria2/aria2/releases/latest) and extract `aria2c.exe`)
 
 ### Local Development Setup
 
