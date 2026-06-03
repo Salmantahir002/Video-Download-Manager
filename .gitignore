@@ -10,11 +10,11 @@ app/downloads/
 ffmpeg-8.0.1-full_build/
 yt-dlp.exe
 Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe.db
+app/bin/ffmpeg.exe
 
 # Build outputs
 dist/
 build/
-app/bin/
 
 # OS/IDE files
 .vscode/

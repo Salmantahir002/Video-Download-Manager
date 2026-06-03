@@ -211,6 +211,56 @@ public class FolderPicker {
         }
     }
 }
+
+// Automatically download ffmpeg.exe if missing in development
+function checkAndDownloadFFmpeg() {
+    if (isPkg) return; // Only needed in dev mode
+    
+    const localBinDir = path.join(__dirname, 'bin');
+    const ffmpegPath = path.join(localBinDir, 'ffmpeg.exe');
+    
+    if (fs.existsSync(ffmpegPath)) return;
+    
+    console.log('⚠️ ffmpeg.exe is missing from app/bin/.');
+    console.log('🔄 Downloading compact FFmpeg essentials binary automatically...');
+    
+    const zipUrl = 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip';
+    const tempZip = path.join(localBinDir, 'ffmpeg_temp.zip');
+    const tempDir = path.join(localBinDir, 'ffmpeg_temp');
+    
+    try {
+        if (!fs.existsSync(localBinDir)) {
+            fs.mkdirSync(localBinDir, { recursive: true });
+        }
+        
+        // Use powershell to download and extract synchronously to make it zero-setup
+        const downloadCmd = `powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '${zipUrl}' -OutFile '${tempZip}'"`;
+        console.log('Downloading zip archive (this may take a moment depending on your connection)...');
+        execSync(downloadCmd);
+        
+        console.log('Extracting ffmpeg.exe from zip...');
+        const extractCmd = `powershell -Command "Expand-Archive -Path '${tempZip}' -DestinationPath '${tempDir}' -Force"`;
+        execSync(extractCmd);
+        
+        // Find ffmpeg.exe in the extracted directory
+        const files = fs.readdirSync(tempDir);
+        const buildFolder = files.find(f => f.startsWith('ffmpeg-'));
+        if (buildFolder) {
+            const extractedFfmpeg = path.join(tempDir, buildFolder, 'bin', 'ffmpeg.exe');
+            if (fs.existsSync(extractedFfmpeg)) {
+                fs.copyFileSync(extractedFfmpeg, ffmpegPath);
+                console.log('✅ ffmpeg.exe successfully installed in app/bin/!');
+            }
+        }
+        
+        // Cleanup temp files
+        if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
+        if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch (err) {
+        console.error('❌ Failed to download FFmpeg automatically. Please download it manually from https://www.gyan.dev/ffmpeg/builds/ and place ffmpeg.exe in app/bin/ folder.', err.message);
+    }
+}
+checkAndDownloadFFmpeg();
 setupFolderPickerDev();
 
 // Config management - persists user's download folder preference
