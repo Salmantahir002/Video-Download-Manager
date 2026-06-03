@@ -3,11 +3,25 @@
   "version": "1.0.0",
   "description": "Beautiful web interface for yt-dlp",
   "main": "server.js",
+  "bin": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "package": "pkg . --out-path ../dist/"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "pkg": {
+    "assets": [
+      "public/**/*",
+      "bin/**/*"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ]
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
   }
 }

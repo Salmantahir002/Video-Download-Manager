@@ -1,16 +1,80 @@
 const express = require('express');
 const cors = require('cors');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const app = express();
 const PORT = 3000;
 
-// Paths
-const YT_DLP_PATH = path.join(__dirname, '..', 'yt-dlp.exe');
-const DOWNLOADS_PATH = path.join(__dirname, '..', 'downloads');
-const FFMPEG_PATH = path.join(__dirname, '..', 'ffmpeg-8.0.1-full_build', 'bin');
+const isPkg = typeof process.pkg !== 'undefined';
+
+// Physical directory on user's machine to run external binaries
+const USER_DATA_DIR = path.join(os.homedir(), '.yt-dlp-web');
+const BIN_DIR = path.join(USER_DATA_DIR, 'bin');
+const DOWNLOADS_PATH = path.join(os.homedir(), 'Downloads', 'YT-Downloads');
+
+// Ensure directories exist
+if (!fs.existsSync(USER_DATA_DIR)) fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+if (!fs.existsSync(BIN_DIR)) fs.mkdirSync(BIN_DIR, { recursive: true });
+if (!fs.existsSync(DOWNLOADS_PATH)) fs.mkdirSync(DOWNLOADS_PATH, { recursive: true });
+
+// Target executable paths
+const YT_DLP_PATH = path.join(BIN_DIR, 'yt-dlp.exe');
+const FFMPEG_PATH = BIN_DIR; // yt-dlp expects FFMPEG_PATH to be the directory containing ffmpeg.exe
+
+// Extract binaries from pkg if running in packaged mode
+function extractBinaries() {
+    const binaries = ['yt-dlp.exe', 'ffmpeg.exe'];
+    
+    for (const bin of binaries) {
+        const destPath = path.join(BIN_DIR, bin);
+        
+        // Resolve source path (in pkg, it's inside the virtual directory. In dev, it is in app/bin)
+        let srcPath = path.join(__dirname, 'bin', bin);
+        if (!isPkg && !fs.existsSync(srcPath)) {
+            // Fallback for development if bin is not inside app/bin yet
+            srcPath = path.join(__dirname, '..', bin === 'yt-dlp.exe' ? 'yt-dlp.exe' : 'ffmpeg-8.0.1-full_build/bin/ffmpeg.exe');
+        }
+        
+        if (!fs.existsSync(srcPath)) {
+            console.error(`Source binary not found: ${srcPath}`);
+            continue;
+        }
+
+        let shouldExtract = false;
+        if (!fs.existsSync(destPath)) {
+            shouldExtract = true;
+        } else {
+            // Compare file sizes to see if they differ
+            try {
+                const srcStats = fs.statSync(srcPath);
+                const destStats = fs.statSync(destPath);
+                if (srcStats.size !== destStats.size) {
+                    shouldExtract = true;
+                }
+            } catch (err) {
+                shouldExtract = true;
+            }
+        }
+        
+        if (shouldExtract) {
+            console.log(`Extracting ${bin} to ${destPath}...`);
+            try {
+                const data = fs.readFileSync(srcPath);
+                fs.writeFileSync(destPath, data);
+                // Make sure the binary is executable
+                fs.chmodSync(destPath, 0o755);
+            } catch (err) {
+                console.error(`Failed to extract ${bin}:`, err.message);
+            }
+        }
+    }
+}
+
+// Call extraction immediately
+extractBinaries();
 
 // Track active downloads for abort functionality
 const activeDownloads = new Map();
@@ -340,6 +404,26 @@ function updateYtDlp() {
     });
 }
 
+// Browser auto-opener helper
+function openBrowser(url) {
+    let command = '';
+    switch (process.platform) {
+        case 'darwin':
+            command = `open "${url}"`;
+            break;
+        case 'win32':
+            command = `start "" "${url}"`;
+            break;
+        default:
+            command = `xdg-open "${url}"`;
+    }
+    exec(command, (err) => {
+        if (err) {
+            console.error('Failed to open browser:', err);
+        }
+    });
+}
+
 // Start server
 app.listen(PORT, () => {
     console.log(`
@@ -354,6 +438,10 @@ app.listen(PORT, () => {
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
     `);
+
+    // Auto-open browser on startup
+    console.log('🌐 Opening interface in browser...');
+    openBrowser(`http://localhost:${PORT}`);
 
     // Check for updates 5 seconds after server starts (non-blocking)
     setTimeout(updateYtDlp, 5000);
