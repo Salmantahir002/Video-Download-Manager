@@ -335,6 +335,40 @@ async function saveNewPath(newPath) {
     }
 }
 
+async function selectFolderDialog() {
+    if (changePathBtn.disabled) return;
+
+    const originalHTML = changePathBtn.innerHTML;
+    changePathBtn.disabled = true;
+    changePathBtn.classList.add('loading');
+    changePathBtn.innerHTML = `
+        <div class="loading-spinner-small"></div>
+        Opening…
+    `;
+    hideStatus();
+
+    try {
+        const res = await fetch('/api/select-folder', { method: 'POST' });
+        if (!res.ok) throw new Error('API request failed');
+
+        const data = await res.json();
+        if (data.success && data.path) {
+            await saveNewPath(data.path);
+        } else if (data.error) {
+            showStatus('error', data.error);
+        } else if (data.cancelled) {
+            console.log('User cancelled folder selection dialog.');
+        }
+    } catch (err) {
+        showStatus('error', 'Failed to launch file manager. Falling back to manual text entry.');
+        showEditRow();
+    } finally {
+        changePathBtn.disabled = false;
+        changePathBtn.classList.remove('loading');
+        changePathBtn.innerHTML = originalHTML;
+    }
+}
+
 function showEditRow() {
     pathInput.value = currentConfig.downloadsPath;
     pathEditRow.classList.remove('hidden');
@@ -349,7 +383,7 @@ function hideEditRow() {
 
 // Event listeners for settings
 if (changePathBtn) {
-    changePathBtn.addEventListener('click', showEditRow);
+    changePathBtn.addEventListener('click', selectFolderDialog);
 }
 
 if (cancelPathBtn) {

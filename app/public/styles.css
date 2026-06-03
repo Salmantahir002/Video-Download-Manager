@@ -877,6 +877,22 @@ body {
     transform: translateY(-1px);
 }
 
+.settings__change-btn.loading {
+    opacity: 0.75;
+    cursor: wait;
+    transform: none !important;
+}
+
+.settings__change-btn .loading-spinner-small {
+    width: 12px;
+    height: 12px;
+    border: 1.8px solid rgba(255, 107, 107, 0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
 .settings__edit-row {
     display: flex;
     align-items: center;

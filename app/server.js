@@ -186,6 +186,52 @@ app.post('/api/open-folder', (req, res) => {
     res.json({ success: true });
 });
 
+// Select folder via system dialog
+app.post('/api/select-folder', (req, res) => {
+    console.log('📂 Opening folder selection dialog...');
+    if (process.platform === 'win32') {
+        // PowerShell command to open FolderBrowserDialog
+        const psCommand = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Add-Type -AssemblyName System.Windows.Forms; $dialog = New-Object System.Windows.Forms.FolderBrowserDialog; $dialog.Description = 'Select Downloads Folder'; $dialog.ShowNewFolderButton = $true; if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $dialog.SelectedPath }"`;
+        
+        exec(psCommand, (err, stdout, stderr) => {
+            if (err) {
+                console.error('Folder dialog error:', err);
+                return res.status(500).json({ error: 'Failed to open folder dialog' });
+            }
+            const selectedPath = stdout.trim();
+            if (!selectedPath) {
+                console.log('Folder dialog cancelled by user');
+                return res.json({ success: false, cancelled: true });
+            }
+            console.log('Selected folder from dialog:', selectedPath);
+            res.json({ success: true, path: selectedPath });
+        });
+    } else if (process.platform === 'darwin') {
+        const appleScript = `osascript -e "POSIX path of (choose folder with prompt \\"Select Downloads Folder\\")"`;
+        exec(appleScript, (err, stdout, stderr) => {
+            if (err) {
+                // If user cancels, AppleScript exits with error code
+                console.log('Folder dialog cancelled by user');
+                return res.json({ success: false, cancelled: true });
+            }
+            const selectedPath = stdout.trim();
+            console.log('Selected folder from dialog:', selectedPath);
+            res.json({ success: true, path: selectedPath });
+        });
+    } else {
+        // Linux
+        exec('zenity --file-selection --directory --title="Select Downloads Folder"', (err, stdout, stderr) => {
+            if (err) {
+                console.log('Folder dialog cancelled by user');
+                return res.json({ success: false, cancelled: true });
+            }
+            const selectedPath = stdout.trim();
+            console.log('Selected folder from dialog:', selectedPath);
+            res.json({ success: true, path: selectedPath });
+        });
+    }
+});
+
 // Get available formats for a URL
 app.post('/api/formats', (req, res) => {
     const { url } = req.body;
