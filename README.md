@@ -1,4 +1,4 @@
-# YT-DLP Video Manager (v1.0)
+# YT-DLP Video Manager (v3.0)
 
 A beautiful, self-hosted web interface wrapper for [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [FFmpeg](https://ffmpeg.org/), designed to make downloading high-quality videos and audio streams from YouTube and other sites incredibly easy.
 
@@ -7,11 +7,13 @@ A beautiful, self-hosted web interface wrapper for [yt-dlp](https://github.com/y
 ## ✨ Features
 
 - **Modern Web Interface:** Clean, responsive, glassmorphic UI styled with custom dark-mode aesthetics.
+- **Maximized Download Speeds (aria2c):** Integrates `aria2c` as an external downloader, enabling multi-threaded HTTP/DASH/HLS downloads (up to 16 connections per file) to achieve the highest possible speed of your internet connection.
+- **Searchable Supported Sites Directory:** A dynamic header button that loads and caches all 1,400+ supported sites from `yt-dlp`, featuring a real-time search bar and click-to-input shortcuts.
+- **Instant Folder Picker:** Custom native C# compiled helper to trigger the Windows Explorer-style directory picker instantly (with PowerShell and manual text fallbacks).
 - **Instant Video Previews:** Paste a URL to quickly fetch the video thumbnail, title, and uploader name using fast oEmbed caching.
 - **Multiple Formats & Qualities:**
   - **Video:** Download in resolutions ranging from standard 360p up to 4K (2160p) with automatic audio merging.
   - **Audio:** Extract high-quality audio files directly to `MP3`, `Opus` (native download), `M4A`, `FLAC`, or `WAV`.
-- **Maximized Download Speeds:** Pre-configured speed flags enabling multi-threaded fragment downloads (`--concurrent-fragments 16`), larger buffer sizes, and optimal chunk sizes.
 - **Real-Time Progress Logs:** Watch download percentages, file size estimations, speeds, and ETA updates in real-time.
 - **Cancel Anytime:** Clean abort mechanism that terminates the download process immediately and automatically cleans up partial/fragment temp files.
 - **Self-Updating Engine:** Automatically checks for and applies `yt-dlp` updates on startup.
@@ -21,15 +23,19 @@ A beautiful, self-hosted web interface wrapper for [yt-dlp](https://github.com/y
 ## 🛠️ Project Structure
 
 ```text
-Video-Manager/
+Video-Download-Manager/
 ├── app/
+│   ├── bin/                # Contains local binaries (ignored by git, must be placed here)
+│   │   ├── ffmpeg.exe
+│   │   ├── folder_picker.cs
+│   │   ├── folder_picker.exe
+│   │   └── yt-dlp.exe
 │   ├── public/             # Frontend assets (HTML, CSS, JS)
 │   │   ├── index.html      # Main user interface
 │   │   ├── styles.css      # Glassmorphic custom CSS styling
-│   │   └── app.js          # Web-socket/API connection and UI logic
+│   │   └── app.js          # Client-side download and settings logic
 │   ├── package.json        # Node.js dependencies (Express, CORS, pkg config)
 │   └── server.js           # Backend server spawning yt-dlp and managing processes
-├── start.bat               # Convenient launcher script for local dev
 ├── .gitignore              # Ignores downloads, node_modules, and heavy binaries
 └── README.md               # Project documentation
 ```
@@ -42,18 +48,17 @@ Video-Manager/
 
 To run this application locally in development mode, you need:
 1. **Node.js** (v18 or higher recommended)
-2. **yt-dlp.exe** downloaded and placed in the project root folder.
-3. **FFmpeg** binaries (`ffmpeg.exe`) placed in `ffmpeg-8.0.1-full_build/bin/` inside the project root folder.
+2. **yt-dlp.exe** and **ffmpeg.exe** placed inside the `app/bin/` folder.
 
 ### Local Development Setup
 
 1. Clone this repository or copy the project files:
    ```bash
-   git clone https://github.com/Salmantahir002/Video-Manager.git
-   cd Video-Manager
+   git clone https://github.com/Salmantahir002/Video-Download-Manager.git
+   cd Video-Download-Manager
    ```
 
-2. Double-click `start.bat` or run:
+2. Run the application:
    ```bash
    # Navigate to the app folder
    cd app

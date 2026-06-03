@@ -428,6 +428,126 @@ if (resetPathBtn) {
     });
 }
 
+// ===== Supported Sites Modal Logic =====
+const supportedSitesBtn = document.getElementById('supportedSitesBtn');
+const sitesModal = document.getElementById('sitesModal');
+const modalOverlay = document.getElementById('modalOverlay');
+const modalCloseBtn = document.getElementById('modalCloseBtn');
+const modalSearchInput = document.getElementById('modalSearchInput');
+const modalLoading = document.getElementById('modalLoading');
+const modalError = document.getElementById('modalError');
+const modalSitesList = document.getElementById('modalSitesList');
+const modalRetryBtn = document.getElementById('modalRetryBtn');
+
+let allSupportedSites = [];
+
+// Open Modal
+if (supportedSitesBtn) {
+    supportedSitesBtn.addEventListener('click', () => {
+        sitesModal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden'; // Lock background scrolling
+        if (allSupportedSites.length === 0) {
+            fetchSupportedSites();
+        } else {
+            renderSites(allSupportedSites);
+            modalSearchInput.focus();
+        }
+    });
+}
+
+// Close Modal
+function closeSitesModal() {
+    sitesModal.classList.add('hidden');
+    document.body.style.overflow = ''; // Restore scroll
+    modalSearchInput.value = ''; // Clear search filter
+}
+
+if (modalOverlay) modalOverlay.addEventListener('click', closeSitesModal);
+if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeSitesModal);
+
+// Close on ESC key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !sitesModal.classList.contains('hidden')) {
+        closeSitesModal();
+    }
+});
+
+// Fetch Supported Sites List
+async function fetchSupportedSites() {
+    modalLoading.classList.remove('hidden');
+    modalError.classList.add('hidden');
+    modalSitesList.classList.add('hidden');
+    
+    try {
+        const res = await fetch('/api/supported-sites');
+        if (!res.ok) throw new Error('API error');
+        
+        const data = await res.json();
+        if (data && data.sites && data.sites.length > 0) {
+            allSupportedSites = data.sites;
+            modalLoading.classList.add('hidden');
+            modalSitesList.classList.remove('hidden');
+            renderSites(allSupportedSites);
+            modalSearchInput.focus();
+        } else {
+            // Empty array means background process is still loading on startup
+            setTimeout(fetchSupportedSites, 1500); // Retry in 1.5s
+        }
+    } catch (err) {
+        modalLoading.classList.add('hidden');
+        modalError.classList.remove('hidden');
+    }
+}
+
+if (modalRetryBtn) {
+    modalRetryBtn.addEventListener('click', fetchSupportedSites);
+}
+
+// Filter sites on search input
+if (modalSearchInput) {
+    modalSearchInput.addEventListener('input', () => {
+        const query = modalSearchInput.value.toLowerCase().trim();
+        const filtered = allSupportedSites.filter(site => site.toLowerCase().includes(query));
+        renderSites(filtered);
+    });
+}
+
+// Render sites to the list
+function renderSites(sites) {
+    modalSitesList.innerHTML = '';
+    
+    if (sites.length === 0) {
+        const placeholder = document.createElement('li');
+        placeholder.className = 'modal__item';
+        placeholder.style.gridColumn = '1 / -1';
+        placeholder.style.color = 'var(--text-muted)';
+        placeholder.textContent = 'No matching sites found';
+        modalSitesList.appendChild(placeholder);
+        return;
+    }
+    
+    // Efficiently append items in fragments
+    const fragment = document.createDocumentFragment();
+    sites.forEach(site => {
+        const li = document.createElement('li');
+        li.className = 'modal__item';
+        li.textContent = site;
+        li.title = `Download from ${site}`;
+        
+        // Add click helper to insert search suggestion to main input if they click
+        li.addEventListener('click', () => {
+            urlInput.value = `https://www.${site.toLowerCase()}.com/`;
+            urlInput.focus();
+            closeSitesModal();
+            // Trigger input event to show preview or clear previous
+            urlInput.dispatchEvent(new Event('input'));
+        });
+        
+        fragment.appendChild(li);
+    });
+    modalSitesList.appendChild(fragment);
+}
+
 // Load config on startup
 document.addEventListener('DOMContentLoaded', () => {
     loadConfigFromServer();

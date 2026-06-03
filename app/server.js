@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { spawn, exec } = require('child_process');
+const { spawn, exec, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -19,6 +19,199 @@ const DEFAULT_DOWNLOADS_PATH = path.join(os.homedir(), 'Downloads', 'YT-Download
 // Ensure directories exist
 if (!fs.existsSync(USER_DATA_DIR)) fs.mkdirSync(USER_DATA_DIR, { recursive: true });
 if (!fs.existsSync(BIN_DIR)) fs.mkdirSync(BIN_DIR, { recursive: true });
+const SCRIPTS_DIR = path.join(USER_DATA_DIR, 'scripts');
+if (!fs.existsSync(SCRIPTS_DIR)) fs.mkdirSync(SCRIPTS_DIR, { recursive: true });
+
+// Modern folder picker script — uses IFileOpenDialog COM interface
+// This gives the full Windows Explorer-style dialog (like "Save As" in browsers)
+const FOLDER_PICKER_PATH = path.join(SCRIPTS_DIR, 'folder_picker.ps1');
+const FOLDER_PICKER_SCRIPT = `Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+[ComImport, Guid("DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7")]
+public class FileOpenDialogCOM { }
+
+[ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IShellItem {
+    void BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppv);
+    void GetParent(out IShellItem ppsi);
+    void GetDisplayName(uint sigdnName, [MarshalAs(UnmanagedType.LPWStr)] out string ppszName);
+    void GetAttributes(uint sfgaoMask, out uint psfgaoAttribs);
+    void Compare(IShellItem psi, uint hint, out int piOrder);
+}
+
+[ComImport, Guid("42F85136-DB7E-439C-85F1-E4075D135FC8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IFileOpenDialog {
+    [PreserveSig] int Show(IntPtr parent);
+    void SetFileTypes(uint cFileTypes, IntPtr rgFilterSpec);
+    void SetFileTypeIndex(uint iFileType);
+    void GetFileTypeIndex(out uint piFileType);
+    void Advise(IntPtr pfde, out uint pdwCookie);
+    void Unadvise(uint dwCookie);
+    void SetOptions(uint fos);
+    void GetOptions(out uint pfos);
+    void SetDefaultFolder(IShellItem psi);
+    void SetFolder(IShellItem psi);
+    void GetFolder(out IShellItem ppsi);
+    void GetCurrentSelection(out IShellItem ppsi);
+    void SetFileName([MarshalAs(UnmanagedType.LPWStr)] string pszName);
+    void GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string pszName);
+    void SetTitle([MarshalAs(UnmanagedType.LPWStr)] string pszTitle);
+    void SetOkButtonLabel([MarshalAs(UnmanagedType.LPWStr)] string pszText);
+    void SetFileNameLabel([MarshalAs(UnmanagedType.LPWStr)] string pszLabel);
+    void GetResult(out IShellItem ppsi);
+    void AddPlace(IShellItem psi, int fdap);
+    void SetDefaultExtension([MarshalAs(UnmanagedType.LPWStr)] string pszDefaultExtension);
+    void Close(int hr);
+    void SetClientGuid(ref Guid guid);
+    void ClearClientData();
+    void SetFilter(IntPtr pFilter);
+    void GetResults(out IntPtr ppenum);
+    void GetSelectedItems(out IntPtr ppsai);
+}
+
+public class FolderPicker {
+    [DllImport("user32.dll")]
+    static extern IntPtr GetForegroundWindow();
+
+    public static string ShowDialog() {
+        try {
+            var dialog = (IFileOpenDialog)new FileOpenDialogCOM();
+            dialog.SetTitle("Select Downloads Folder");
+            dialog.SetOkButtonLabel("Select Folder");
+            uint options;
+            dialog.GetOptions(out options);
+            dialog.SetOptions(options | 0x20u | 0x40u);
+            IntPtr hwnd = GetForegroundWindow();
+            int hr = dialog.Show(hwnd);
+            if (hr != 0) return string.Empty;
+            IShellItem result;
+            dialog.GetResult(out result);
+            string path;
+            result.GetDisplayName(0x80058000, out path);
+            return path;
+        } catch (Exception ex) {
+            Console.Error.WriteLine("FolderPicker error: " + ex.Message);
+            return string.Empty;
+        }
+    }
+}
+"@
+
+$result = [FolderPicker]::ShowDialog()
+if ($result) { Write-Output $result }
+`;
+fs.writeFileSync(FOLDER_PICKER_PATH, FOLDER_PICKER_SCRIPT, 'utf-8');
+
+// Compile folder_picker.exe locally in development mode if missing
+function setupFolderPickerDev() {
+    if (isPkg) return; // Only needed in dev mode
+    
+    const localBinDir = path.join(__dirname, 'bin');
+    if (!fs.existsSync(localBinDir)) {
+        fs.mkdirSync(localBinDir, { recursive: true });
+    }
+    
+    const csPath = path.join(localBinDir, 'folder_picker.cs');
+    const exePath = path.join(localBinDir, 'folder_picker.exe');
+    
+    const csContent = `using System;
+using System.Runtime.InteropServices;
+
+[ComImport, Guid("DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7")]
+public class FileOpenDialogCOM { }
+
+[ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IShellItem {
+    void BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppv);
+    void GetParent(out IShellItem ppsi);
+    void GetDisplayName(uint sigdnName, [MarshalAs(UnmanagedType.LPWStr)] out string ppszName);
+    void GetAttributes(uint sfgaoMask, out uint psfgaoAttribs);
+    void Compare(IShellItem psi, uint hint, out int piOrder);
+}
+
+[ComImport, Guid("42F85136-DB7E-439C-85F1-E4075D135FC8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IFileOpenDialog {
+    [PreserveSig] int Show(IntPtr parent);
+    void SetFileTypes(uint cFileTypes, IntPtr rgFilterSpec);
+    void SetFileTypeIndex(uint iFileType);
+    void GetFileTypeIndex(out uint piFileType);
+    void Advise(IntPtr pfde, out uint pdwCookie);
+    void Unadvise(uint dwCookie);
+    void SetOptions(uint fos);
+    void GetOptions(out uint pfos);
+    void SetDefaultFolder(IShellItem psi);
+    void SetFolder(IShellItem psi);
+    void GetFolder(out IShellItem ppsi);
+    void GetCurrentSelection(out IShellItem ppsi);
+    void SetFileName([MarshalAs(UnmanagedType.LPWStr)] string pszName);
+    void GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string pszName);
+    void SetTitle([MarshalAs(UnmanagedType.LPWStr)] string pszTitle);
+    void SetOkButtonLabel([MarshalAs(UnmanagedType.LPWStr)] string pszText);
+    void SetFileNameLabel([MarshalAs(UnmanagedType.LPWStr)] string pszLabel);
+    void GetResult(out IShellItem ppsi);
+    void AddPlace(IShellItem psi, int fdap);
+    void SetDefaultExtension([MarshalAs(UnmanagedType.LPWStr)] string pszDefaultExtension);
+    void Close(int hr);
+    void SetClientGuid(ref Guid guid);
+    void ClearClientData();
+    void SetFilter(IntPtr pFilter);
+    void GetResults(out IntPtr ppenum);
+    void GetSelectedItems(out IntPtr ppsai);
+}
+
+public class FolderPicker {
+    [DllImport("user32.dll")]
+    static extern IntPtr GetForegroundWindow();
+
+    [STAThread]
+    public static void Main(string[] args) {
+        try {
+            var dialog = (IFileOpenDialog)new FileOpenDialogCOM();
+            dialog.SetTitle("Select Downloads Folder");
+            dialog.SetOkButtonLabel("Select Folder");
+            uint options;
+            dialog.GetOptions(out options);
+            dialog.SetOptions(options | 0x20u | 0x40u); // FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM
+            
+            IntPtr hwnd = GetForegroundWindow();
+            int hr = dialog.Show(hwnd);
+            if (hr == 0) {
+                IShellItem result;
+                dialog.GetResult(out result);
+                string path;
+                result.GetDisplayName(0x80058000, out path); // SIGDN_FILESYSPATH
+                Console.Write(path);
+            }
+        } catch (Exception) {
+            Environment.Exit(1);
+        }
+    }
+}`;
+
+    fs.writeFileSync(csPath, csContent, 'utf-8');
+
+    if (!fs.existsSync(exePath)) {
+        console.log('🔨 Compiling local folder picker helper...');
+        const csc64 = 'C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe';
+        const csc32 = 'C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\csc.exe';
+        const cscPath = fs.existsSync(csc64) ? csc64 : (fs.existsSync(csc32) ? csc32 : null);
+
+        if (cscPath) {
+            const compileCmd = `"${cscPath}" /target:winexe /out:"${exePath}" "${csPath}"`;
+            try {
+                execSync(compileCmd);
+                console.log('✅ Folder picker helper compiled successfully!');
+            } catch (err) {
+                console.error('⚠️ Failed to compile folder picker helper:', err.message);
+            }
+        } else {
+            console.log('⚠️ csc.exe not found. Folder picker will rely on PowerShell backup at runtime.');
+        }
+    }
+}
+setupFolderPickerDev();
 
 // Config management - persists user's download folder preference
 function loadConfig() {
@@ -66,11 +259,12 @@ if (!fs.existsSync(getDownloadsPath())) {
 
 // Target executable paths
 const YT_DLP_PATH = path.join(BIN_DIR, 'yt-dlp.exe');
+const ARIA2C_PATH = path.join(BIN_DIR, 'aria2c.exe');
 const FFMPEG_PATH = BIN_DIR; // yt-dlp expects FFMPEG_PATH to be the directory containing ffmpeg.exe
 
 // Extract binaries from pkg if running in packaged mode
 function extractBinaries() {
-    const binaries = ['yt-dlp.exe', 'ffmpeg.exe'];
+    const binaries = ['yt-dlp.exe', 'ffmpeg.exe', 'folder_picker.exe', 'aria2c.exe'];
     
     for (const bin of binaries) {
         const destPath = path.join(BIN_DIR, bin);
@@ -79,7 +273,7 @@ function extractBinaries() {
         let srcPath = path.join(__dirname, 'bin', bin);
         if (!isPkg && !fs.existsSync(srcPath)) {
             // Fallback for development if bin is not inside app/bin yet
-            srcPath = path.join(__dirname, '..', bin === 'yt-dlp.exe' ? 'yt-dlp.exe' : 'ffmpeg-8.0.1-full_build/bin/ffmpeg.exe');
+            srcPath = path.join(__dirname, '..', bin === 'yt-dlp.exe' ? 'yt-dlp.exe' : (bin === 'folder_picker.exe' ? 'app/bin/folder_picker.exe' : (bin === 'aria2c.exe' ? 'app/bin/aria2c.exe' : 'ffmpeg-8.0.1-full_build/bin/ffmpeg.exe')));
         }
         
         if (!fs.existsSync(srcPath)) {
@@ -137,6 +331,11 @@ app.get('/api/config', (req, res) => {
     });
 });
 
+// Get supported sites from yt-dlp
+app.get('/api/supported-sites', (req, res) => {
+    res.json({ sites: supportedSites });
+});
+
 // Set download path
 app.post('/api/config', (req, res) => {
     const { downloadsPath } = req.body;
@@ -186,16 +385,37 @@ app.post('/api/open-folder', (req, res) => {
     res.json({ success: true });
 });
 
-// Select folder via system dialog
+// Select folder via modern system file explorer dialog
 app.post('/api/select-folder', (req, res) => {
     console.log('📂 Opening folder selection dialog...');
-    if (process.platform === 'win32') {
-        // PowerShell command to open FolderBrowserDialog in STA mode, wrapped in a topmost transparent form
-        const psCommand = `powershell -NoProfile -ExecutionPolicy Bypass -STA -Command "Add-Type -AssemblyName System.Windows.Forms; $form = New-Object System.Windows.Forms.Form; $form.TopMost = $true; $form.Opacity = 0; $form.ShowInTaskbar = $false; $form.Show(); $dialog = New-Object System.Windows.Forms.FolderBrowserDialog; $dialog.Description = 'Select Downloads Folder'; $dialog.ShowNewFolderButton = $true; if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $dialog.SelectedPath }; $form.Close()"`;
-        
-        exec(psCommand, (err, stdout, stderr) => {
+    
+    const runExe = () => {
+        const folderPickerExe = path.join(BIN_DIR, 'folder_picker.exe');
+        console.log('Running pre-compiled folder picker executable:', folderPickerExe);
+        exec(`"${folderPickerExe}"`, { timeout: 120000 }, (err, stdout, stderr) => {
             if (err) {
-                console.error('Folder dialog error:', err);
+                console.warn('Folder picker executable failed, trying PowerShell fallback:', err.message);
+                runPowerShellFallback();
+                return;
+            }
+            
+            const selectedPath = stdout.trim();
+            if (!selectedPath) {
+                console.log('Folder dialog cancelled by user');
+                return res.json({ success: false, cancelled: true });
+            }
+            console.log('Selected folder from dialog (exe):', selectedPath);
+            res.json({ success: true, path: selectedPath });
+        });
+    };
+    
+    const runPowerShellFallback = () => {
+        console.log('Running PowerShell folder picker fallback...');
+        const psCommand = `powershell -NoProfile -STA -ExecutionPolicy Bypass -File "${FOLDER_PICKER_PATH}"`;
+        exec(psCommand, { timeout: 120000 }, (err, stdout, stderr) => {
+            if (stderr) console.error('Folder dialog stderr:', stderr);
+            if (err) {
+                console.error('Folder dialog error:', err.message);
                 return res.status(500).json({ error: 'Failed to open folder dialog' });
             }
             const selectedPath = stdout.trim();
@@ -203,14 +423,23 @@ app.post('/api/select-folder', (req, res) => {
                 console.log('Folder dialog cancelled by user');
                 return res.json({ success: false, cancelled: true });
             }
-            console.log('Selected folder from dialog:', selectedPath);
+            console.log('Selected folder from dialog (PS):', selectedPath);
             res.json({ success: true, path: selectedPath });
         });
+    };
+
+    if (process.platform === 'win32') {
+        const folderPickerExe = path.join(BIN_DIR, 'folder_picker.exe');
+        if (fs.existsSync(folderPickerExe)) {
+            runExe();
+        } else {
+            console.warn('Folder picker executable not found, using PowerShell fallback');
+            runPowerShellFallback();
+        }
     } else if (process.platform === 'darwin') {
         const appleScript = `osascript -e "POSIX path of (choose folder with prompt \\"Select Downloads Folder\\")"`;
         exec(appleScript, (err, stdout, stderr) => {
             if (err) {
-                // If user cancels, AppleScript exits with error code
                 console.log('Folder dialog cancelled by user');
                 return res.json({ success: false, cancelled: true });
             }
@@ -356,8 +585,10 @@ app.post('/api/download', (req, res) => {
     const currentDlPath = getDownloadsPath();
     const outputTemplate = path.join(currentDlPath, '%(title)s.%(ext)s');
 
-    // Speed optimization flags - maximize download speed
+    // Speed optimization flags - maximize download speed using aria2c
     const speedFlags = [
+        '--downloader', ARIA2C_PATH,
+        '--downloader-args', 'aria2c:-x 16 -s 16 -k 1M',
         '--concurrent-fragments', '16',    // Download 16 fragments simultaneously
         '--buffer-size', '64K',            // Larger buffer size for better throughput
         '--http-chunk-size', '10M',        // 10MB chunks for faster downloads
@@ -554,6 +785,32 @@ function updateYtDlp() {
         }
     });
 }
+// Supported sites caching list
+let supportedSites = [];
+
+function loadSupportedSites() {
+    console.log('🔄 Loading supported sites from yt-dlp...');
+    exec(`"${YT_DLP_PATH}" --list-extractors`, (err, stdout, stderr) => {
+        if (err) {
+            console.error('⚠️ Failed to load supported sites:', err.message);
+            return;
+        }
+        const lines = stdout.split('\n');
+        const sitesSet = new Set();
+        for (let line of lines) {
+            line = line.trim();
+            if (!line) continue;
+            if (line.toLowerCase().startsWith('generic') || line.includes(':')) continue;
+            let name = line.split('(')[0].trim();
+            if (name) {
+                sitesSet.add(name);
+            }
+        }
+        supportedSites = Array.from(sitesSet).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+        console.log(`✅ Loaded ${supportedSites.length} supported sites from yt-dlp`);
+    });
+}
+
 
 // Browser auto-opener helper
 function openBrowser(url) {
@@ -596,4 +853,7 @@ app.listen(PORT, () => {
 
     // Check for updates 5 seconds after server starts (non-blocking)
     setTimeout(updateYtDlp, 5000);
+
+    // Load supported sites 2 seconds after server starts (non-blocking)
+    setTimeout(loadSupportedSites, 2000);
 });

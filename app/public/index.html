@@ -37,6 +37,16 @@
                 </div>
                 <span class="topbar__title">Video Manager</span>
             </div>
+            <div class="topbar__actions">
+                <button class="topbar__btn" id="supportedSitesBtn">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="16" x2="12" y2="12"/>
+                        <line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
+                    <span>Supported Sites</span>
+                </button>
+            </div>
             <div class="topbar__status">
                 <span class="status-dot"></span>
                 <span class="status-label">Engine Online</span>
@@ -246,6 +256,45 @@
         <footer class="footer">
             <p>Video Manager — powered by <code>yt-dlp</code> & <code>ffmpeg</code></p>
         </footer>
+    </div>
+
+    <!-- Supported Sites Modal -->
+    <div class="modal hidden" id="sitesModal">
+        <div class="modal__overlay" id="modalOverlay"></div>
+        <div class="modal__container">
+            <div class="modal__header">
+                <h3 class="modal__title">Supported Sites</h3>
+                <button class="modal__close-btn" id="modalCloseBtn" aria-label="Close modal">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal__body">
+                <p class="modal__subtitle">Search or browse the thousands of websites supported by yt-dlp. Just paste the URL to start downloading.</p>
+                <div class="modal__search-wrap">
+                    <svg class="modal__search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input type="text" id="modalSearchInput" placeholder="Search websites... (e.g. youtube, vimeo, soundcloud)" autocomplete="off" spellcheck="false">
+                </div>
+                
+                <div class="modal__list-container">
+                    <div class="modal__loading" id="modalLoading">
+                        <div class="loading-spinner"></div>
+                        <span>Loading supported sites list…</span>
+                    </div>
+                    <div class="modal__error hidden" id="modalError">
+                        <span>Failed to load supported sites.</span>
+                        <button class="settings__btn" id="modalRetryBtn">Retry</button>
+                    </div>
+                    <ul class="modal__list hidden" id="modalSitesList">
+                        <!-- Dynamic items will go here -->
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>
