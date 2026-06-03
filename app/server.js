@@ -190,8 +190,8 @@ app.post('/api/open-folder', (req, res) => {
 app.post('/api/select-folder', (req, res) => {
     console.log('📂 Opening folder selection dialog...');
     if (process.platform === 'win32') {
-        // PowerShell command to open FolderBrowserDialog
-        const psCommand = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Add-Type -AssemblyName System.Windows.Forms; $dialog = New-Object System.Windows.Forms.FolderBrowserDialog; $dialog.Description = 'Select Downloads Folder'; $dialog.ShowNewFolderButton = $true; if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $dialog.SelectedPath }"`;
+        // PowerShell command to open FolderBrowserDialog in STA mode, wrapped in a topmost transparent form
+        const psCommand = `powershell -NoProfile -ExecutionPolicy Bypass -STA -Command "Add-Type -AssemblyName System.Windows.Forms; $form = New-Object System.Windows.Forms.Form; $form.TopMost = $true; $form.Opacity = 0; $form.ShowInTaskbar = $false; $form.Show(); $dialog = New-Object System.Windows.Forms.FolderBrowserDialog; $dialog.Description = 'Select Downloads Folder'; $dialog.ShowNewFolderButton = $true; if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $dialog.SelectedPath }; $form.Close()"`;
         
         exec(psCommand, (err, stdout, stderr) => {
             if (err) {
