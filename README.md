@@ -48,7 +48,10 @@ Video-Download-Manager/
 
 To run this application locally in development mode, you need:
 1. **Node.js** (v18 or higher recommended)
-2. **yt-dlp.exe** and **ffmpeg.exe** placed inside the `app/bin/` folder.
+2. **Binaries:** Download the following three executables and place them inside the `app/bin/` folder of your cloned repository:
+   * **`yt-dlp.exe`** (Download the Windows executable from the [yt-dlp GitHub Releases](https://github.com/yt-dlp/yt-dlp/releases/latest))
+   * **`ffmpeg.exe`** (Download from [gyan.dev Builds](https://www.gyan.dev/ffmpeg/builds/) - get the essentials zip and extract `ffmpeg.exe` from its `bin` folder)
+   * **`aria2c.exe`** (Download the Windows 64-bit zip from the [aria2 GitHub Releases](https://github.com/aria2/aria2/releases/latest) and extract `aria2c.exe`)
 
 ### Local Development Setup
 
