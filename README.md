@@ -20,24 +20,58 @@ A beautiful, self-hosted web interface wrapper for [yt-dlp](https://github.com/y
 
 ---
 
+## 📋 Prerequisites
+
+Before running this application locally, you must ensure the following are installed and configured:
+
+### 1. Node.js
+- **Minimum version required:** **Node.js v18.0.0+** (v20+ recommended).
+- Used to run the Express backend server.
+- Verify your installation by running `node -v` in your terminal.
+- Download link: [Node.js Official Website](https://nodejs.org/)
+
+### 2. External Binaries (Required in Development)
+Since heavy executables are excluded from Git control (listed in `.gitignore`), you must download and place them in the `app/bin/` directory manually:
+
+*   **FFmpeg (`ffmpeg.exe`):**
+    - **Purpose:** Merges separate high-quality video and audio streams downloaded by `yt-dlp` (required for resolutions like 1080p, 4K, and for MP3 conversions).
+    - **Download:** Download the latest release from the official Windows builds page: [Gyan.dev FFmpeg Builds](https://www.gyan.dev/ffmpeg/builds/) (e.g., `ffmpeg-release-essentials.zip`).
+    - **Placement:** Extract the zip, find `ffmpeg.exe` in the extracted `bin/` subfolder, and copy it to:
+      `Video-Download-Manager/app/bin/ffmpeg.exe`
+
+*   **yt-dlp (`yt-dlp.exe`):**
+    - **Purpose:** The core downloading engine.
+    - **Download:** Download the latest version from [yt-dlp GitHub Releases](https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe).
+    - **Placement:** Save `yt-dlp.exe` directly to:
+      `Video-Download-Manager/app/bin/yt-dlp.exe`
+
+*   **aria2c (`aria2c.exe`):**
+    - **Purpose:** External download accelerator that unlocks multi-threaded connections (up to 16 connections per download) to maximize download speeds.
+    - **Download:** Download the latest Windows release from [aria2 GitHub Releases](https://github.com/aria2/aria2/releases) (e.g., `aria2-1.37.0-win-64bit-build1.zip`).
+    - **Placement:** Extract the zip, find `aria2c.exe` in the extracted folder, and copy it to:
+      `Video-Download-Manager/app/bin/aria2c.exe`
+
+---
+
 ## 🛠️ Project Structure
 
 ```text
 Video-Download-Manager/
 ├── app/
 │   ├── bin/
-│   │   ├── ffmpeg.exe
-│   │   ├── folder_picker.cs
-│   │   ├── folder_picker.exe
-│   │   └── yt-dlp.exe
-│   ├── public/             # Frontend assets (HTML, CSS, JS)
-│   │   ├── index.html      # Main user interface
-│   │   ├── styles.css      # Glassmorphic custom CSS styling
-│   │   └── app.js          # Client-side download and settings logic
-│   ├── package.json        # Node.js dependencies (Express, CORS, pkg config)
-│   └── server.js           # Backend server spawning yt-dlp and managing processes
-├── .gitignore              # Ignores downloads, node_modules, and heavy binaries
-└── README.md               # Project documentation
+│   │   ├── aria2c.exe        # High-speed multi-threaded downloader
+│   │   ├── ffmpeg.exe        # Video/audio merger and converter
+│   │   ├── folder_picker.cs  # Folder selection dialog source code
+│   │   ├── folder_picker.exe # Compiled folder selection helper
+│   │   └── yt-dlp.exe        # Core downloading engine
+│   ├── public/               # Web client files (HTML, CSS, JS)
+│   │   ├── index.html        # Glassmorphic user interface
+│   │   ├── styles.css        # Responsive dark-mode styling
+│   │   └── app.js            # Frontend controller logic
+│   ├── package.json          # Node.js dependencies & pkg compilation options
+│   └── server.js             # Express API backend
+├── .gitignore                # Version control exclusions
+└── README.md                 # Project documentation
 ```
 
 ---
