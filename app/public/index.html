@@ -190,11 +190,61 @@
                     <span class="status-text"></span>
                 </div>
             </section>
+
+            <!-- Download Location Settings -->
+            <section class="settings" id="settingsPanel">
+                <div class="settings__header">
+                    <div class="settings__label">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                        </svg>
+                        <span>Download Location</span>
+                    </div>
+                    <div class="settings__actions">
+                        <button class="settings__btn" id="openFolderBtn" title="Open folder">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                                <polyline points="15 3 21 3 21 9"/>
+                                <line x1="10" y1="14" x2="21" y2="3"/>
+                            </svg>
+                            <span>Open</span>
+                        </button>
+                        <button class="settings__btn" id="resetPathBtn" title="Reset to default">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="1 4 1 10 7 10"/>
+                                <path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+                            </svg>
+                            <span>Reset</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="settings__path-row">
+                    <div class="settings__path-display" id="pathDisplay">
+                        <svg class="settings__path-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+                        </svg>
+                        <span class="settings__path-text" id="currentPathText">Loading…</span>
+                    </div>
+                    <button class="settings__change-btn" id="changePathBtn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        Change
+                    </button>
+                </div>
+                <!-- Inline edit row (hidden by default) -->
+                <div class="settings__edit-row hidden" id="pathEditRow">
+                    <input type="text" class="settings__edit-input" id="pathInput" placeholder="e.g. C:\Users\You\Videos\Downloads" spellcheck="false">
+                    <button class="settings__save-btn" id="savePathBtn">Save</button>
+                    <button class="settings__cancel-btn" id="cancelPathBtn">Cancel</button>
+                </div>
+            </section>
         </main>
 
         <!-- Footer -->
         <footer class="footer">
-            <p>Downloads are saved to your <code>Downloads/YT-Downloads</code> folder</p>
+            <p>Video Manager — powered by <code>yt-dlp</code> & <code>ffmpeg</code></p>
         </footer>
     </div>
 

@@ -13,12 +13,56 @@ const isPkg = typeof process.pkg !== 'undefined';
 // Physical directory on user's machine to run external binaries
 const USER_DATA_DIR = path.join(os.homedir(), '.yt-dlp-web');
 const BIN_DIR = path.join(USER_DATA_DIR, 'bin');
-const DOWNLOADS_PATH = path.join(os.homedir(), 'Downloads', 'YT-Downloads');
+const CONFIG_PATH = path.join(USER_DATA_DIR, 'config.json');
+const DEFAULT_DOWNLOADS_PATH = path.join(os.homedir(), 'Downloads', 'YT-Downloads');
 
 // Ensure directories exist
 if (!fs.existsSync(USER_DATA_DIR)) fs.mkdirSync(USER_DATA_DIR, { recursive: true });
 if (!fs.existsSync(BIN_DIR)) fs.mkdirSync(BIN_DIR, { recursive: true });
-if (!fs.existsSync(DOWNLOADS_PATH)) fs.mkdirSync(DOWNLOADS_PATH, { recursive: true });
+
+// Config management - persists user's download folder preference
+function loadConfig() {
+    try {
+        if (fs.existsSync(CONFIG_PATH)) {
+            return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+        }
+    } catch (err) {
+        console.error('Failed to load config:', err.message);
+    }
+    return { downloadsPath: DEFAULT_DOWNLOADS_PATH };
+}
+
+function saveConfig(config) {
+    try {
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+    } catch (err) {
+        console.error('Failed to save config:', err.message);
+    }
+}
+
+function getDownloadsPath() {
+    const config = loadConfig();
+    const dlPath = config.downloadsPath || DEFAULT_DOWNLOADS_PATH;
+    // Ensure the directory exists
+    if (!fs.existsSync(dlPath)) {
+        try {
+            fs.mkdirSync(dlPath, { recursive: true });
+        } catch (err) {
+            console.error('Failed to create downloads directory:', err.message);
+            // Fallback to default
+            if (!fs.existsSync(DEFAULT_DOWNLOADS_PATH)) {
+                fs.mkdirSync(DEFAULT_DOWNLOADS_PATH, { recursive: true });
+            }
+            return DEFAULT_DOWNLOADS_PATH;
+        }
+    }
+    return dlPath;
+}
+
+// Ensure default downloads directory exists on startup
+if (!fs.existsSync(getDownloadsPath())) {
+    fs.mkdirSync(getDownloadsPath(), { recursive: true });
+}
 
 // Target executable paths
 const YT_DLP_PATH = path.join(BIN_DIR, 'yt-dlp.exe');
@@ -83,6 +127,65 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ===== Config API =====
+// Get current config (download path)
+app.get('/api/config', (req, res) => {
+    const config = loadConfig();
+    res.json({
+        downloadsPath: config.downloadsPath || DEFAULT_DOWNLOADS_PATH,
+        defaultPath: DEFAULT_DOWNLOADS_PATH
+    });
+});
+
+// Set download path
+app.post('/api/config', (req, res) => {
+    const { downloadsPath } = req.body;
+    if (!downloadsPath || typeof downloadsPath !== 'string') {
+        return res.status(400).json({ error: 'Invalid downloads path' });
+    }
+
+    // Normalize path separators
+    const normalizedPath = path.resolve(downloadsPath.trim());
+
+    // Try to create the directory if it doesn't exist
+    try {
+        if (!fs.existsSync(normalizedPath)) {
+            fs.mkdirSync(normalizedPath, { recursive: true });
+        }
+    } catch (err) {
+        return res.status(400).json({ error: `Cannot create directory: ${err.message}` });
+    }
+
+    // Verify write permission by creating a temp file
+    const testFile = path.join(normalizedPath, '.write-test');
+    try {
+        fs.writeFileSync(testFile, 'test');
+        fs.unlinkSync(testFile);
+    } catch (err) {
+        return res.status(400).json({ error: `No write permission to this folder: ${err.message}` });
+    }
+
+    const config = loadConfig();
+    config.downloadsPath = normalizedPath;
+    saveConfig(config);
+
+    console.log('Downloads path updated to:', normalizedPath);
+    res.json({ success: true, downloadsPath: normalizedPath });
+});
+
+// Open folder in system file explorer
+app.post('/api/open-folder', (req, res) => {
+    const dlPath = getDownloadsPath();
+    if (process.platform === 'win32') {
+        exec(`explorer "${dlPath}"`);
+    } else if (process.platform === 'darwin') {
+        exec(`open "${dlPath}"`);
+    } else {
+        exec(`xdg-open "${dlPath}"`);
+    }
+    res.json({ success: true });
+});
+
 // Get available formats for a URL
 app.post('/api/formats', (req, res) => {
     const { url } = req.body;
@@ -132,7 +235,8 @@ app.post('/api/formats', (req, res) => {
 // Cleanup partial/incomplete files from downloads folder
 function cleanupPartialFiles() {
     try {
-        const files = fs.readdirSync(DOWNLOADS_PATH);
+        const currentDlPath = getDownloadsPath();
+        const files = fs.readdirSync(currentDlPath);
         const partialPatterns = ['.part', '.ytdl', '.temp', '.tmp'];
 
         files.forEach(file => {
@@ -140,7 +244,7 @@ function cleanupPartialFiles() {
                 file.includes('.f') && file.includes('.part'); // Fragment files like .f140.part
 
             if (isPartial) {
-                const filePath = path.join(DOWNLOADS_PATH, file);
+                const filePath = path.join(currentDlPath, file);
                 try {
                     fs.unlinkSync(filePath);
                     console.log(`Cleaned up partial file: ${file}`);
@@ -203,7 +307,8 @@ app.post('/api/download', (req, res) => {
     res.write(`data: ${JSON.stringify({ type: 'started', downloadId })}\n\n`);
 
     let args = [];
-    const outputTemplate = path.join(DOWNLOADS_PATH, '%(title)s.%(ext)s');
+    const currentDlPath = getDownloadsPath();
+    const outputTemplate = path.join(currentDlPath, '%(title)s.%(ext)s');
 
     // Speed optimization flags - maximize download speed
     const speedFlags = [
@@ -432,7 +537,7 @@ app.listen(PORT, () => {
 ║   🎬 YT-DLP Web Interface is running!                 ║
 ║                                                       ║
 ║   Open in browser: http://localhost:${PORT}              ║
-║   Downloads will be saved to: ${DOWNLOADS_PATH}       ║
+║   Downloads will be saved to: ${getDownloadsPath()}       ║
 ║                                                       ║
 ║   Press Ctrl+C to stop the server                     ║
 ║                                                       ║

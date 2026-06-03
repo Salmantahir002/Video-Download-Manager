@@ -286,3 +286,115 @@ function showStatus(type, message) {
 function hideStatus() {
     statusMessage.className = 'toast hidden';
 }
+
+// ===== Download Location Settings =====
+const currentPathText = document.getElementById('currentPathText');
+const changePathBtn = document.getElementById('changePathBtn');
+const pathEditRow = document.getElementById('pathEditRow');
+const pathInput = document.getElementById('pathInput');
+const savePathBtn = document.getElementById('savePathBtn');
+const cancelPathBtn = document.getElementById('cancelPathBtn');
+const openFolderBtn = document.getElementById('openFolderBtn');
+const resetPathBtn = document.getElementById('resetPathBtn');
+const pathDisplay = document.getElementById('pathDisplay');
+
+let currentConfig = { downloadsPath: '', defaultPath: '' };
+
+// Fetch config on load
+async function loadConfigFromServer() {
+    try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+            currentConfig = await res.json();
+            currentPathText.textContent = currentConfig.downloadsPath;
+        }
+    } catch (err) {
+        currentPathText.textContent = 'Failed to load path';
+    }
+}
+
+// Save new path
+async function saveNewPath(newPath) {
+    try {
+        const res = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ downloadsPath: newPath })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            currentConfig.downloadsPath = data.downloadsPath;
+            currentPathText.textContent = data.downloadsPath;
+            hideEditRow();
+            showStatus('success', 'Download location updated!');
+        } else {
+            showStatus('error', data.error || 'Failed to update path');
+        }
+    } catch (err) {
+        showStatus('error', 'Failed to save path. Is the server running?');
+    }
+}
+
+function showEditRow() {
+    pathInput.value = currentConfig.downloadsPath;
+    pathEditRow.classList.remove('hidden');
+    pathInput.focus();
+    pathInput.select();
+}
+
+function hideEditRow() {
+    pathEditRow.classList.add('hidden');
+    pathInput.value = '';
+}
+
+// Event listeners for settings
+if (changePathBtn) {
+    changePathBtn.addEventListener('click', showEditRow);
+}
+
+if (cancelPathBtn) {
+    cancelPathBtn.addEventListener('click', hideEditRow);
+}
+
+if (savePathBtn) {
+    savePathBtn.addEventListener('click', () => {
+        const newPath = pathInput.value.trim();
+        if (!newPath) {
+            showStatus('error', 'Please enter a valid folder path');
+            return;
+        }
+        saveNewPath(newPath);
+    });
+}
+
+if (pathInput) {
+    pathInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            savePathBtn.click();
+        }
+    });
+}
+
+if (openFolderBtn) {
+    openFolderBtn.addEventListener('click', async () => {
+        try {
+            await fetch('/api/open-folder', { method: 'POST' });
+        } catch (err) {
+            showStatus('error', 'Failed to open folder');
+        }
+    });
+}
+
+if (resetPathBtn) {
+    resetPathBtn.addEventListener('click', async () => {
+        if (currentConfig.defaultPath) {
+            await saveNewPath(currentConfig.defaultPath);
+            showStatus('success', 'Download location reset to default.');
+        }
+    });
+}
+
+// Load config on startup
+document.addEventListener('DOMContentLoaded', () => {
+    loadConfigFromServer();
+});
