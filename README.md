@@ -87,8 +87,6 @@ Video-Download-Manager/
 
 ---
 
----
-
 ## 📝 License & Disclaimer
 
 This project is for educational and personal use only. Please respect the terms of service of YouTube and any other platform from which you download content.
