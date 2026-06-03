@@ -18,6 +18,7 @@ const thumbnail = document.getElementById('thumbnail');
 const videoTitle = document.getElementById('videoTitle');
 const videoUploader = document.getElementById('videoUploader');
 const stopBtn = document.getElementById('stopBtn');
+const toggleSlider = document.getElementById('toggleSlider');
 
 // State
 let currentMode = 'video';
@@ -38,6 +39,13 @@ function setupEventListeners() {
             const text = await navigator.clipboard.readText();
             urlInput.value = text;
             urlInput.dispatchEvent(new Event('input'));
+            // Visual feedback
+            pasteBtn.style.color = 'var(--success)';
+            pasteBtn.style.borderColor = 'var(--success)';
+            setTimeout(() => {
+                pasteBtn.style.color = '';
+                pasteBtn.style.borderColor = '';
+            }, 800);
         } catch (err) {
             showStatus('error', 'Unable to access clipboard');
         }
@@ -81,11 +89,13 @@ function setMode(mode) {
         audioModeBtn.classList.remove('active');
         videoOptions.classList.remove('hidden');
         audioOptions.classList.add('hidden');
+        toggleSlider.classList.remove('right');
     } else {
         audioModeBtn.classList.add('active');
         videoModeBtn.classList.remove('active');
         audioOptions.classList.remove('hidden');
         videoOptions.classList.add('hidden');
+        toggleSlider.classList.add('right');
     }
 }
 
@@ -118,12 +128,14 @@ function showPreview(info) {
     videoTitle.textContent = info.title;
     videoUploader.textContent = info.uploader;
 
-    document.querySelector('.preview-placeholder').style.display = 'none';
+    const placeholder = document.getElementById('previewPlaceholder');
+    if (placeholder) placeholder.style.display = 'none';
     previewContent.classList.add('active');
 }
 
 function hidePreview() {
-    document.querySelector('.preview-placeholder').style.display = 'flex';
+    const placeholder = document.getElementById('previewPlaceholder');
+    if (placeholder) placeholder.style.display = 'flex';
     previewContent.classList.remove('active');
 }
 
@@ -188,7 +200,6 @@ async function startDownload() {
         }
     } catch (err) {
         if (err.name === 'AbortError') {
-            // User cancelled - don't show error
             console.log('Download was cancelled by user');
         } else {
             showStatus('error', 'Download failed. Please try again.');
@@ -206,12 +217,10 @@ async function startDownload() {
 async function stopDownload() {
     if (!isDownloading) return;
 
-    // Abort the fetch request
     if (abortController) {
         abortController.abort();
     }
 
-    // If we have a download ID, tell the server to kill the process
     if (currentDownloadId) {
         try {
             await fetch(`/api/abort/${currentDownloadId}`, {
@@ -262,7 +271,7 @@ function handleProgressUpdate(data) {
 function showProgress() {
     progressSection.classList.remove('hidden');
     progressFill.style.width = '0%';
-    progressText.textContent = 'Starting download...';
+    progressText.textContent = 'Preparing download…';
 }
 
 function hideProgress() {
@@ -270,10 +279,10 @@ function hideProgress() {
 }
 
 function showStatus(type, message) {
-    statusMessage.className = `status-message ${type}`;
+    statusMessage.className = `toast ${type}`;
     statusMessage.querySelector('.status-text').textContent = message;
 }
 
 function hideStatus() {
-    statusMessage.className = 'status-message hidden';
+    statusMessage.className = 'toast hidden';
 }
